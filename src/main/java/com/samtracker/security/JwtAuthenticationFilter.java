@@ -13,16 +13,12 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtService jwtService;
     private final CredentialRepository credentialRepository;
@@ -37,9 +33,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain chain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
-        log.info("JWT request method={} path={} authorizationPresent={} fallbackPresent={}",
-            request.getMethod(), request.getRequestURI(), authHeader != null,
-            request.getHeader("X-SAM-Tracker-Token") != null);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             String fallbackToken = request.getHeader("X-SAM-Tracker-Token");
             authHeader = fallbackToken == null ? null : "Bearer " + fallbackToken;
@@ -50,10 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        boolean tokenValid = jwtService.isTokenValid(token);
-        log.info("JWT validation method={} valid={} existingAuthentication={}", request.getMethod(), tokenValid,
-            SecurityContextHolder.getContext().getAuthentication() != null);
-        if (!tokenValid) {
+        if (!jwtService.isTokenValid(token)) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
             return;
         }
@@ -65,8 +55,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             String subject = jwtService.extractSubject(token);
             Credential credential = credentialRepository.findByUsername(subject).orElse(null);
-                log.info("JWT subject={} tenantId={} credentialFound={} credentialTenant={}", subject, tenantId,
-                    credential != null, credential == null ? null : credential.getTenantId());
             if (credential == null || !tenantId.equals(credential.getTenantId())) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token subject");
                 return;
@@ -76,8 +64,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     List.of(new SimpleGrantedAuthority("ROLE_" + role)));
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(auth);
-                log.info("JWT authority method={} authority=ROLE_{} authenticated={}", request.getMethod(), role,
-                    SecurityContextHolder.getContext().getAuthentication().isAuthenticated());
         }
 
         chain.doFilter(request, response);

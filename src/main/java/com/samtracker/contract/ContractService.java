@@ -838,8 +838,12 @@ public class ContractService {
     }
 
     private Long resolveTenantIdForContract(Integer contractId) {
-        return contractRepository.findTenantIdByContractId(contractId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
+        Long tenantId = jdbcTemplate.query("SELECT tenant_id FROM contracts WHERE contract_id = ? LIMIT 1",
+                rs -> rs.next() ? rs.getLong("tenant_id") : null, contractId);
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found");
+        }
+        return tenantId;
     }
 
     private boolean isCurrentUserAdmin() {
