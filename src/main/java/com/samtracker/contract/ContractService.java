@@ -659,7 +659,7 @@ public class ContractService {
     private List<Contract> fetchContractsForAdmin(Integer contractId) {
         String sql = """
                     SELECT c.contract_id, c.tenant_id, c.contract_number, c.department, c.start_date, c.end_date, c.status, c.value,
-                                        c.vendor_id AS contract_vendor_id, c.vendor_name, c.vendor_jde_number, c.software_name,
+                                        c.it_owner, c.comments, c.vendor_id AS contract_vendor_id, c.vendor_name, c.vendor_jde_number, c.software_name,
                                     v.name AS vendor_entity_name, v.vendor_id AS vendor_display_id, v.vendor_jde_number AS vendor_entity_jde_number, v.canonical_name, v.contact_email, v.website
                     FROM contracts c
                 LEFT JOIN vendors v ON v.tenant_id = c.tenant_id AND v.vendor_id = c.vendor_id
@@ -686,6 +686,7 @@ public class ContractService {
         contract.setContractNumber(rs.getString("contract_number"));
         contract.setDepartment(rs.getString("department"));
         contract.setItOwner(rs.getString("it_owner"));
+        contract.setComments(rs.getString("comments"));
         contract.setVendorId((Integer) rs.getObject("contract_vendor_id"));
         contract.setVendorName(rs.getString("vendor_name"));
         contract.setVendorJDENumber(rs.getString("vendor_jde_number"));
