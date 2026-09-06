@@ -198,10 +198,10 @@ public class ContractService {
 
         int updated = jdbcTemplate.update(
                 """
-                                        UPDATE contracts
-                SET vendor_id = ?, vendor_name = ?, vendor_jde_number = ?, contract_number = ?, department = ?, it_owner = ?, comments = ?, software_name = ?, start_date = ?, end_date = ?, status = ?, value = ?
-                                        WHERE contract_id = ? AND tenant_id = ?
-                                        """,
+                                                UPDATE contracts
+                        SET vendor_id = ?, vendor_name = ?, vendor_jde_number = ?, contract_number = ?, department = ?, it_owner = ?, comments = ?, software_name = ?, start_date = ?, end_date = ?, status = ?, value = ?
+                                                WHERE contract_id = ? AND tenant_id = ?
+                                                """,
                 vendor.getVendorId(),
                 vendor.getName(),
                 vendor.getVendorJDENumber(),
@@ -221,8 +221,8 @@ public class ContractService {
         }
 
         jdbcTemplate.update(
-            "UPDATE entitlements SET start_date = ?, expiry_date = ?, it_owner = ? WHERE contract_id = ? AND tenant_id = ?",
-            request.startDate(), request.endDate(), request.itOwner(), id, tenantId);
+                "UPDATE entitlements SET start_date = ?, expiry_date = ?, it_owner = ? WHERE contract_id = ? AND tenant_id = ?",
+                request.startDate(), request.endDate(), request.itOwner(), id, tenantId);
 
         return fetchContractByIdForAdmin(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
@@ -328,7 +328,8 @@ public class ContractService {
                 "SELECT start_date, end_date, vendor_name FROM contracts WHERE contract_id = ? AND tenant_id = ?",
                 contractId, tenantId);
         String vendorName = (String) contract.get("vendor_name");
-        String version = request.version() == null || request.version().isBlank() ? "default" : request.version().strip();
+        String version = request.version() == null || request.version().isBlank() ? "default"
+                : request.version().strip();
         Integer softwareId = jdbcTemplate.query(
                 "SELECT software_id FROM software_products WHERE tenant_id = ? AND vendor = ? AND name = ? AND version = ? LIMIT 1",
                 rs -> rs.next() ? rs.getObject("software_id", Integer.class) : null,
