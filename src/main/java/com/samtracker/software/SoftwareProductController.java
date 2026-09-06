@@ -23,7 +23,7 @@ public class SoftwareProductController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public Page<SoftwareProduct> getAll(
             @RequestParam(required = false) String vendor,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -34,20 +34,20 @@ public class SoftwareProductController {
     }
 
     @GetMapping("/vendors")
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public List<VendorSoftwareSummary> getVendorSummary() {
         return softwareProductService.findVendorSummary();
     }
 
     @GetMapping("/vendor-count")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public Map<String, Long> getVendorCountBySoftwareName(@RequestParam String name) {
         return Map.of("vendors", softwareProductService.countVendorsBySoftwareName(name));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public SoftwareProduct create(@Valid @RequestBody CreateSoftwareProductRequest request) {
         return softwareProductService.create(request);
     }

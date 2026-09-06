@@ -11,7 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/credentials")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public class CredentialController {
 
     private final CredentialRepository credentialRepository;

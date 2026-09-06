@@ -30,7 +30,7 @@ public class VendorController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public Page<Vendor> getAll(@RequestParam(required = false) String q,
             @PageableDefault(size = 20) Pageable pageable) {
         return q != null && !q.isBlank() ? vendorService.findByNameContains(q, pageable)
@@ -38,52 +38,52 @@ public class VendorController {
     }
 
     @GetMapping("/software-counts")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public Map<Integer, Long> getSoftwareCounts() {
         return vendorService.findSoftwareCounts();
     }
 
     @GetMapping("/{vendorId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public Vendor getById(@PathVariable Integer vendorId) {
         return vendorService.findById(vendorId);
     }
 
     @GetMapping("/duplicates")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public List<VendorDuplicatePair> getDuplicates() {
         return vendorService.findPossibleDuplicates();
     }
 
     @GetMapping("/{vendorId}/contracts")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public Page<Contract> getContracts(@PathVariable Integer vendorId, @PageableDefault(size = 20) Pageable pageable) {
         return contractService.findByVendorId(vendorId, pageable);
     }
 
     @GetMapping("/{vendorId}/software")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public Page<SoftwareProduct> getSoftware(@PathVariable Integer vendorId,
             @PageableDefault(size = 50) Pageable pageable) {
         return softwareProductService.findByVendorName(vendorService.findById(vendorId).getName(), pageable);
     }
 
     @GetMapping("/{vendorId}/licenses")
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public List<com.samtracker.contract.ContractLicenseView> getLicenses(@PathVariable Integer vendorId) {
         return contractService.findVendorLicenses(vendorId);
     }
 
     @PostMapping("/{vendorId}/licenses")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public com.samtracker.contract.ContractLicenseView addLicense(@PathVariable Integer vendorId,
             @Valid @RequestBody com.samtracker.contract.CreateContractLicenseRequest request) {
         return contractService.addVendorLicense(vendorId, request);
     }
 
     @PutMapping("/{vendorId}/licenses/{licenseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public com.samtracker.contract.ContractLicenseView updateLicense(@PathVariable Integer vendorId,
             @PathVariable Integer licenseId,
             @Valid @RequestBody com.samtracker.contract.UpdateContractLicenseRequest request) {
@@ -92,14 +92,14 @@ public class VendorController {
 
     @DeleteMapping("/{vendorId}/licenses/{licenseId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public void deleteLicense(@PathVariable Integer vendorId, @PathVariable Integer licenseId) {
         contractService.deleteVendorLicense(vendorId, licenseId);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','USER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_EDITOR','ROLE_USER')")
     public Vendor create(@RequestBody Vendor vendor) {
         return vendorService.create(vendor);
     }
