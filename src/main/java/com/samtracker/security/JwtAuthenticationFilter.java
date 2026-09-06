@@ -13,12 +13,16 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtService jwtService;
     private final CredentialRepository credentialRepository;
@@ -33,6 +37,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain chain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
+        log.info("JWT request method={} path={} authorizationPresent={} fallbackPresent={}",
+            request.getMethod(), request.getRequestURI(), authHeader != null,
+            request.getHeader("X-SAM-Tracker-Token") != null);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             String fallbackToken = request.getHeader("X-SAM-Tracker-Token");
             authHeader = fallbackToken == null ? null : "Bearer " + fallbackToken;
