@@ -321,6 +321,43 @@ public class ContractService {
                 rs.getObject("expiry_date", LocalDate.class));
     }
 
+    private ContractLicenseView updateLicenseForAdminJdbc(Integer contractId, Integer licenseId,
+            UpdateContractLicenseRequest request) {
+        Long tenantId = resolveTenantIdForContract(contractId);
+        Map<String, Object> contract = jdbcTemplate.queryForMap(
+                "SELECT start_date, end_date, vendor_name FROM contracts WHERE contract_id = ? AND tenant_id = ?",
+                contractId, tenantId);
+        String vendorName = (String) contract.get("vendor_name");
+        String version = request.version() == null || request.version().isBlank() ? "default" : request.version().strip();
+        Integer softwareId = jdbcTemplate.query(
+                "SELECT software_id FROM software_products WHERE tenant_id = ? AND vendor = ? AND name = ? AND version = ? LIMIT 1",
+                rs -> rs.next() ? rs.getObject("software_id", Integer.class) : null,
+                tenantId, vendorName, request.softwareName().strip(), version);
+        if (softwareId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Software not found");
+        }
+        int updated = jdbcTemplate.update("""
+                UPDATE entitlements
+                SET software_id = ?, license_name = ?, it_owner = ?, comments = ?, license_type = ?,
+                    status = ?, payment_method = ?, seats_purchased = ?, price = ?, start_date = ?, expiry_date = ?
+                WHERE license_id = ? AND contract_id = ? AND tenant_id = ?
+                """, softwareId, request.licenseName().strip(), request.itOwner(), request.comments(),
+                request.licenseType().name(), request.status() == null ? "ACTIVE" : request.status().name(),
+                request.paymentMethod() == null ? "PURCHASE_ORDER" : request.paymentMethod().name(),
+                request.seatsPurchased(), request.price(), contract.get("start_date"), contract.get("end_date"),
+                licenseId, contractId, tenantId);
+        if (updated == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "License not found");
+        }
+        return jdbcTemplate.query("""
+                SELECT e.license_id, e.contract_id, e.license_name, e.it_owner, e.comments,
+                       s.software_id, s.vendor, s.name, s.version, e.license_type,
+                       e.status, e.payment_method, e.seats_purchased, e.price, e.start_date, e.expiry_date
+                FROM entitlements e JOIN software_products s ON s.software_id = e.software_id
+                WHERE e.license_id = ? AND e.tenant_id = ?
+                """, rs -> rs.next() ? mapLicenseRow(rs) : null, licenseId, tenantId);
+    }
+
     public List<ContractLicenseView> findAllLicensesForCurrentUser() {
         Long tenantId = TenantContext.get();
         return entitlementRepository.findByTenantId(tenantId, PageRequest.of(0, 10000)).getContent().stream()
@@ -396,6 +433,10 @@ public class ContractService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "licenseType is required");
         }
 
+        if (isCurrentUserAdmin()) {
+            return updateLicenseForAdminJdbc(contractId, licenseId, request);
+        }
+
         Long tenantId = resolveAccessibleContractTenant(contractId);
         return runInTenant(tenantId, () -> {
             Contract contract = requireContract(contractId, tenantId);
@@ -428,6 +469,15 @@ public class ContractService {
 
     public void deleteLicense(Integer contractId, Integer licenseId) {
         Long tenantId = resolveAccessibleContractTenant(contractId);
+        if (isCurrentUserAdmin()) {
+            int deleted = jdbcTemplate.update(
+                    "DELETE FROM entitlements WHERE license_id = ? AND contract_id = ? AND tenant_id = ?",
+                    licenseId, contractId, tenantId);
+            if (deleted == 0) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "License not found");
+            }
+            return;
+        }
         runInTenant(tenantId, () -> {
             Contract contract = requireContract(contractId, tenantId);
             Entitlement entitlement = entitlementRepository.findByTenantIdAndId(tenantId, licenseId)
