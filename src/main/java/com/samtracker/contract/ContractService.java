@@ -194,12 +194,12 @@ public class ContractService {
     private Contract updateForAdmin(Integer id, UpdateContractRequest request) {
         Long tenantId = resolveTenantIdForContract(id);
         validateContractInput(request);
-        var vendor = runInTenant(tenantId, () -> findVendorByPublicId(tenantId, request.vendorId()));
+        var vendor = findVendorByPublicIdForAdmin(tenantId, request.vendorId());
 
         int updated = jdbcTemplate.update(
                 """
                                         UPDATE contracts
-                        SET vendor_id = ?, vendor_name = ?, vendor_jde_number = ?, contract_number = ?, department = ?, software_name = ?, start_date = ?, end_date = ?, status = ?, value = ?
+                SET vendor_id = ?, vendor_name = ?, vendor_jde_number = ?, contract_number = ?, department = ?, it_owner = ?, comments = ?, software_name = ?, start_date = ?, end_date = ?, status = ?, value = ?
                                         WHERE contract_id = ? AND tenant_id = ?
                                         """,
                 vendor.getVendorId(),
@@ -207,6 +207,8 @@ public class ContractService {
                 vendor.getVendorJDENumber(),
                 request.contractNumber().strip(),
                 request.department() == null ? null : request.department().strip(),
+                request.itOwner() == null ? null : request.itOwner().strip(),
+                request.comments() == null ? null : request.comments().strip(),
                 request.softwareName() == null ? null : request.softwareName().strip(),
                 request.startDate(),
                 request.endDate(),
@@ -218,10 +220,9 @@ public class ContractService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found");
         }
 
-        runInTenant(tenantId, () -> {
-            syncContractLicenseDates(id, tenantId, request.startDate(), request.endDate());
-            return null;
-        });
+        jdbcTemplate.update(
+            "UPDATE entitlements SET start_date = ?, expiry_date = ?, it_owner = ? WHERE contract_id = ? AND tenant_id = ?",
+            request.startDate(), request.endDate(), request.itOwner(), id, tenantId);
 
         return fetchContractByIdForAdmin(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
@@ -608,6 +609,31 @@ public class ContractService {
         }
         return vendorRepository.findByTenantIdAndVendorId(tenantId, vendorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found"));
+    }
+
+    private Vendor findVendorByPublicIdForAdmin(Long tenantId, Integer vendorId) {
+        if (vendorId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "vendorId is required");
+        }
+        return jdbcTemplate.query("""
+                SELECT vendor_id, tenant_id, name, vendor_jde_number, canonical_name,
+                       contact_email, address, website, comments
+                FROM vendors WHERE tenant_id = ? AND vendor_id = ?
+                """, rs -> {
+            if (!rs.next()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found");
+            }
+            Vendor vendor = new Vendor();
+            vendor.setVendorId(rs.getObject("vendor_id", Integer.class));
+            vendor.setName(rs.getString("name"));
+            vendor.setVendorJDENumber(rs.getString("vendor_jde_number"));
+            vendor.setCanonicalName(rs.getString("canonical_name"));
+            vendor.setContactEmail(rs.getString("contact_email"));
+            vendor.setAddress(rs.getString("address"));
+            vendor.setWebsite(rs.getString("website"));
+            vendor.setComments(rs.getString("comments"));
+            return vendor;
+        }, tenantId, vendorId);
     }
 
     private Long resolveAccessibleVendorTenant(Integer vendorId) {
