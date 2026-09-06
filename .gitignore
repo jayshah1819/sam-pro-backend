@@ -1,0 +1,12 @@
+# Local and production secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+*.xlsx
+
+# Build output
+target/
+*.class
