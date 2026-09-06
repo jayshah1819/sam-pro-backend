@@ -2,6 +2,9 @@ package com.samtracker.contract;
 
 import com.samtracker.entitlement.Entitlement;
 import com.samtracker.entitlement.EntitlementRepository;
+import com.samtracker.entitlement.LicenseStatus;
+import com.samtracker.entitlement.LicenseType;
+import com.samtracker.entitlement.PaymentMethod;
 import com.samtracker.tenant.TenantContext;
 import com.samtracker.software.SoftwareProduct;
 import com.samtracker.software.SoftwareProductRepository;
@@ -273,12 +276,45 @@ public class ContractService {
 
     public List<ContractLicenseView> findLicenses(Integer contractId) {
         Long tenantId = resolveAccessibleContractTenant(contractId);
+        if (isCurrentUserAdmin()) {
+            return jdbcTemplate.query("""
+                    SELECT e.license_id, e.contract_id, e.license_name, e.it_owner, e.comments,
+                           s.software_id, s.vendor, s.name, s.version, e.license_type,
+                           e.status, e.payment_method, e.seats_purchased, e.price,
+                           e.start_date, e.expiry_date
+                    FROM entitlements e
+                    JOIN software_products s ON s.software_id = e.software_id
+                        AND s.tenant_id = e.tenant_id
+                    WHERE e.contract_id = ? AND e.tenant_id = ?
+                    ORDER BY e.license_id
+                    """, (rs, rowNum) -> mapLicenseRow(rs), contractId, tenantId);
+        }
         return runInTenant(tenantId, () -> {
             requireContract(contractId, tenantId);
             return entitlementRepository.findByTenantIdAndContract_Id(tenantId, contractId).stream()
                     .map(this::toLicenseView)
                     .toList();
         });
+    }
+
+    private ContractLicenseView mapLicenseRow(ResultSet rs) throws SQLException {
+        return new ContractLicenseView(
+                rs.getObject("license_id", Integer.class),
+                rs.getObject("contract_id", Integer.class),
+                rs.getString("license_name"),
+                rs.getString("it_owner"),
+                rs.getString("comments"),
+                rs.getObject("software_id", Integer.class),
+                rs.getString("vendor"),
+                rs.getString("name"),
+                rs.getString("version"),
+                LicenseType.valueOf(rs.getString("license_type")),
+                LicenseStatus.valueOf(rs.getString("status")),
+                PaymentMethod.valueOf(rs.getString("payment_method")),
+                rs.getObject("seats_purchased", Integer.class),
+                rs.getBigDecimal("price"),
+                rs.getObject("start_date", LocalDate.class),
+                rs.getObject("expiry_date", LocalDate.class));
     }
 
     public List<ContractLicenseView> findAllLicensesForCurrentUser() {
