@@ -34,6 +34,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain chain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            String fallbackToken = request.getHeader("X-SAM-Tracker-Token");
+            authHeader = fallbackToken == null ? null : "Bearer " + fallbackToken;
+        }
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             chain.doFilter(request, response);
             return;
         }
