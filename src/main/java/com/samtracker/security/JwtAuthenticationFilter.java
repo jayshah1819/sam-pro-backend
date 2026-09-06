@@ -50,7 +50,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        if (!jwtService.isTokenValid(token)) {
+        boolean tokenValid = jwtService.isTokenValid(token);
+        log.info("JWT validation method={} valid={} existingAuthentication={}", request.getMethod(), tokenValid,
+            SecurityContextHolder.getContext().getAuthentication() != null);
+        if (!tokenValid) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
             return;
         }
@@ -62,6 +65,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             String subject = jwtService.extractSubject(token);
             Credential credential = credentialRepository.findByUsername(subject).orElse(null);
+                log.info("JWT subject={} tenantId={} credentialFound={} credentialTenant={}", subject, tenantId,
+                    credential != null, credential == null ? null : credential.getTenantId());
             if (credential == null || !tenantId.equals(credential.getTenantId())) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid token subject");
                 return;
