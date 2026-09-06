@@ -218,7 +218,10 @@ public class ContractService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found");
         }
 
-        syncContractLicenseDates(id, tenantId, request.startDate(), request.endDate());
+        runInTenant(tenantId, () -> {
+            syncContractLicenseDates(id, tenantId, request.startDate(), request.endDate());
+            return null;
+        });
 
         return fetchContractByIdForAdmin(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
@@ -494,7 +497,15 @@ public class ContractService {
                 || request.softwareName() == null || request.softwareName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "licenseName and softwareName are required");
         }
-        Long tenantId = TenantContext.get();
+        Long tenantId = resolveAccessibleVendorTenant(vendorId);
+        if (isCurrentUserAdmin()) {
+            return runInTenant(tenantId, () -> updateVendorLicenseInTenant(vendorId, licenseId, request, tenantId));
+        }
+        return updateVendorLicenseInTenant(vendorId, licenseId, request, tenantId);
+    }
+
+    private ContractLicenseView updateVendorLicenseInTenant(Integer vendorId, Integer licenseId,
+            UpdateContractLicenseRequest request, Long tenantId) {
         Vendor vendor = findVendorByPublicId(tenantId, vendorId);
         Entitlement entitlement = entitlementRepository.findByTenantIdAndId(tenantId, licenseId)
                 .filter(existing -> existing.getSoftwareProduct().getVendor().equalsIgnoreCase(vendor.getName()))
@@ -550,7 +561,18 @@ public class ContractService {
     }
 
     public void deleteVendorLicense(Integer vendorId, Integer licenseId) {
-        Long tenantId = TenantContext.get();
+        Long tenantId = resolveAccessibleVendorTenant(vendorId);
+        if (isCurrentUserAdmin()) {
+            runInTenant(tenantId, () -> {
+                deleteVendorLicenseInTenant(vendorId, licenseId, tenantId);
+                return null;
+            });
+            return;
+        }
+        deleteVendorLicenseInTenant(vendorId, licenseId, tenantId);
+    }
+
+    private void deleteVendorLicenseInTenant(Integer vendorId, Integer licenseId, Long tenantId) {
         Vendor vendor = findVendorByPublicId(tenantId, vendorId);
         Entitlement entitlement = entitlementRepository.findByTenantIdAndId(tenantId, licenseId)
                 .filter(existing -> existing.getSoftwareProduct().getVendor().equalsIgnoreCase(vendor.getName()))
@@ -586,6 +608,18 @@ public class ContractService {
         }
         return vendorRepository.findByTenantIdAndVendorId(tenantId, vendorId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found"));
+    }
+
+    private Long resolveAccessibleVendorTenant(Integer vendorId) {
+        if (isCurrentUserAdmin()) {
+            Long tenantId = jdbcTemplate.query("SELECT tenant_id FROM vendors WHERE vendor_id = ? LIMIT 1",
+                    rs -> rs.next() ? rs.getLong("tenant_id") : null, vendorId);
+            if (tenantId == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Vendor not found");
+            }
+            return tenantId;
+        }
+        return TenantContext.get();
     }
 
     private void attachVendorSnapshot(Contract contract) {
