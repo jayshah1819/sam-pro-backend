@@ -1,0 +1,22 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - mvn -B package -DskipTests
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - ECR_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}
+      - aws ecr get-login-password | docker login --username AWS --password-stdin ${ECR_URI}
+  build:
+    commands:
+      - docker build --tag ${ECR_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION} .
+      - docker tag ${ECR_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION} ${ECR_URI}:latest
+  post_build:
+    commands:
+      - docker push ${ECR_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - docker push ${ECR_URI}:latest
+      - printf '[{"name":"sam-tracker","imageUri":"%s"}]' "${ECR_URI}:latest" > imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
