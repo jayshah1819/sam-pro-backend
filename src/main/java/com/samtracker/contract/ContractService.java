@@ -550,6 +550,16 @@ public class ContractService {
         }
         Long tenantId = resolveAccessibleVendorTenant(vendorId);
         if (isCurrentUserAdmin()) {
+            if (request.contractId() != null) {
+                Integer contractVendorId = jdbcTemplate.query(
+                        "SELECT vendor_id FROM contracts WHERE contract_id = ? AND tenant_id = ?",
+                        rs -> rs.next() ? rs.getObject("vendor_id", Integer.class) : null,
+                        request.contractId(), tenantId);
+                if (!vendorId.equals(contractVendorId)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Contract does not belong to vendor");
+                }
+                return updateLicenseForAdminJdbc(request.contractId(), licenseId, request);
+            }
             return runInTenant(tenantId, () -> updateVendorLicenseInTenant(vendorId, licenseId, request, tenantId));
         }
         return updateVendorLicenseInTenant(vendorId, licenseId, request, tenantId);
